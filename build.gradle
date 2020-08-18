@@ -8,7 +8,7 @@ buildscript {
 }
 
 plugins {
-    id "com.github.spotbugs" version "1.6.11"
+    id "com.github.spotbugs" version "4.0.0"
 }
 
 apply plugin: 'java'
@@ -104,10 +104,10 @@ spotbugs {
 spotbugsTest.enabled = false
 
 // To generate an HTML report instead of XML
-tasks.withType(com.github.spotbugs.SpotBugsTask) {
-    reports.xml.enabled = false
-    reports.html.enabled = true
-}
+//tasks.withType(com.github.spotbugs.SpotBugsTask) {
+//    reports.xml.enabled = false
+//    reports.html.enabled = true
+//}
 
 if (!(hasProperty('artifactory_username') && hasProperty('artifactory_apikey'))) {
     print ("No artifactory Info. Publishing impossible.")
