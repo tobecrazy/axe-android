@@ -72,4 +72,14 @@ public class EditTextValueTest {
 
     assertEquals(subject.runRule(axeProps), AxeStatus.FAIL);
   }
+
+  @Test
+  public void overRidesAccessibilityDelegate_returnsFalse() {
+    when(axeProps.get(AxeProps.Name.CLASS_NAME, String.class))
+            .thenReturn("android.widget.Switch");
+    when(axeProps.get(AxeProps.Name.OVERRIDES_ACCESSIBILITY_DELEGATE, Boolean.class))
+            .thenReturn(true);
+
+    assertFalse(subject.isApplicable(axeProps));
+  }
 }
