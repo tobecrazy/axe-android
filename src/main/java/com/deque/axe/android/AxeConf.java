@@ -1,6 +1,9 @@
 package com.deque.axe.android;
 
-import com.deque.axe.android.constants.AxeImpact;
+import static com.deque.axe.android.constants.AxeImpact.CRITICAL;
+import static com.deque.axe.android.constants.AxeImpact.MODERATE;
+import static com.deque.axe.android.constants.AxeImpact.SERIOUS;
+
 import com.deque.axe.android.constants.AxeStandard;
 import com.deque.axe.android.constants.Constants;
 
@@ -12,7 +15,6 @@ import com.deque.axe.android.rules.hierarchy.EditTextValue;
 import com.deque.axe.android.rules.hierarchy.ImageViewName;
 import com.deque.axe.android.rules.hierarchy.SwitchName;
 import com.deque.axe.android.rules.hierarchy.TouchSizeWcag;
-import com.deque.axe.android.rules.hierarchy.base.ActiveView;
 import com.deque.axe.android.rules.stateful.DontMoveAccessibilityFocus;
 import com.deque.axe.android.utils.JsonSerializable;
 import java.util.HashMap;
@@ -20,20 +22,28 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class AxeConf {
 
+  @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+          value = "URF_UNREAD_FIELD",
+          justification = "This is an object that isn't used for anything but serialization."
+  )
+  static class IssueFilterConf implements JsonSerializable {
+
+    boolean onlyShowResultsVisibleToUser = false;
+
+  }
+
   static class RuleConf implements JsonSerializable {
 
-    final @AxeImpact int impact;
+    final int impact;
     final String standard;
     final String summary;
     boolean ignored = false;
 
     RuleConf(
-        final @AxeImpact int impact,
+        final int impact,
         final String standard,
         final String summary
     ) {
@@ -62,7 +72,7 @@ public class AxeConf {
     rules.put(
         ActiveViewName.class.getSimpleName(),
         new RuleConf(
-            AxeImpact.CRITICAL,
+            CRITICAL.getValue(),
             AxeStandard.WCAG_20,
             "Views that users can interact with must have a Name."
         )
@@ -71,7 +81,7 @@ public class AxeConf {
     rules.put(
          CheckBoxName.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.MODERATE,
+             MODERATE.getValue(),
              AxeStandard.BEST_PRACTICE,
              "Views that have modifiable Values should get their name from a nearby Label."
          )
@@ -80,7 +90,7 @@ public class AxeConf {
     rules.put(
          ColorContrast.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.MODERATE,
+             MODERATE.getValue(),
              AxeStandard.WCAG_20,
              "Text adequately contrasts with its background."
          )
@@ -89,7 +99,7 @@ public class AxeConf {
     rules.put(
          EditTextName.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.MODERATE,
+             MODERATE.getValue(),
              AxeStandard.BEST_PRACTICE,
              "Views that have modifiable Values should get their name from a nearby Label."
          )
@@ -98,7 +108,7 @@ public class AxeConf {
     rules.put(
          EditTextValue.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.CRITICAL,
+             CRITICAL.getValue(),
              AxeStandard.WCAG_20,
              "Editable Views must not override the Value spoken by TalkBack."
          )
@@ -107,7 +117,7 @@ public class AxeConf {
     rules.put(
          ImageViewName.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.CRITICAL,
+             CRITICAL.getValue(),
              AxeStandard.WCAG_20,
              "Focusable Informative Views must have Text or a ContentDescription."
          )
@@ -116,7 +126,7 @@ public class AxeConf {
     rules.put(
          SwitchName.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.MODERATE,
+             MODERATE.getValue(),
              AxeStandard.BEST_PRACTICE,
              "Views that have modifiable Values should get their name from a nearby Label."
          )
@@ -125,7 +135,7 @@ public class AxeConf {
     rules.put(
          TouchSizeWcag.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.MODERATE,
+             MODERATE.getValue(),
              AxeStandard.WCAG_21,
              "Active views adhere to WCAG Touch Target Size requirements."
          )
@@ -134,7 +144,7 @@ public class AxeConf {
     rules.put(
          DontMoveAccessibilityFocus.class.getSimpleName(),
          new RuleConf(
-             AxeImpact.SERIOUS,
+             SERIOUS.getValue(),
              AxeStandard.BEST_PRACTICE,
              "Applications should not forcibly move focus around."
          )
@@ -154,15 +164,28 @@ public class AxeConf {
 
   final Map<String, RuleConf> rules = new HashMap<>();
 
+  final IssueFilterConf issueFilterConf = new IssueFilterConf();
+
   public final transient Set<Class<? extends AxeRuleViewHierarchy>> customRules = new HashSet<>();
 
+  /**
+   * A set of AxeRules that will be excluded from result.
+   * @param ruleIds List of ruleIds to ignore.
+   * @param ignore boolean to ignore or not.
+   * @return the AxeConf instance.
+   */
   public AxeConf ignore(final List<String> ruleIds, boolean ignore) {
-    ruleIds.forEach(s -> ignore(s, ignore));
+    for (String s : ruleIds) {
+      ignore(s, ignore);
+    }
     return this;
   }
 
   /**
-   * A set of AxeRules that will be excluded from result.
+   * An AxeRule that will be excluded from result.
+   * @param ruleId ruleId to ignore.
+   * @param ignore boolean to ignore or not.
+   * @return the AxeConf instance.
    */
   public AxeConf ignore(final String ruleId, final boolean ignore) {
     rules.get(ruleId).ignored = ignore;
@@ -209,19 +232,21 @@ public class AxeConf {
 
   private void normalize() {
     // Make sure that all RulesIDs were trying to run are classes we have access to.
-    ruleIds.forEach(s -> {
-      if (!rules.containsKey(s)) {
+    for (String ruleId : ruleIds) {
+      if (!rules.containsKey(ruleId)) {
         throw new RuntimeException("Tried to run a RuleID that doesn't exist.");
       }
-    });
+    }
 
     // Make sure that the RuleIDs list matches the rules data structure.
     ruleIds.clear();
-    rules.forEach((s, ruleConf) -> {
+    for (Map.Entry<String, RuleConf> entry : rules.entrySet()) {
+      String s = entry.getKey();
+      RuleConf ruleConf = entry.getValue();
       if (!ruleConf.ignored) {
         ruleIds.add(s);
       }
-    });
+    }
   }
 
   Set<AxeRule> ruleInstances() {

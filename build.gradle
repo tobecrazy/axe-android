@@ -34,7 +34,6 @@ def mavenVersion = { ->
 }
 
 def group = 'com.deque.android'
-def artifactId = 'axe-android'
 
 repositories {
     google()
@@ -49,10 +48,14 @@ dependencies {
     implementation 'com.android.support:support-annotations:24.2.0'
     implementation 'com.google.code.gson:gson:2.8.5'
     implementation 'org.jetbrains:annotations:15.0'
+    implementation ("com.google.code.findbugs:annotations:3.0.1") {
+        exclude module: 'jsr305'
+        exclude module: 'jcip-annotations'
+    }
 
     testImplementation 'ar.com.hjg:pngj:2.1.0'
     testImplementation 'junit:junit:4.12'
-
+    testImplementation 'org.mockito:mockito-core:2.7.22'
 }
 
 apply plugin: 'jacoco'
@@ -130,13 +133,13 @@ task sourcesJar(type: Jar) {
 
 version = project.hasProperty('versionName') ? project.versionName : 'NOT_A_VERSION_NAME'
 
-signing {
-    sign configurations.archives
-}
-
 if (!(hasProperty('DQ_MAVEN_CENTRAL_USERNAME') && hasProperty('DQ_MAVEN_CENTRAL_APIKEY'))) {
     print ("No artifactory Info. Maven Central Publishing impossible.")
     return
+}
+
+signing {
+    sign configurations.archives
 }
 
 uploadArchives {
@@ -155,7 +158,7 @@ uploadArchives {
             pom.project {
                 name 'Axe Android'
                 groupId = group
-                artifactId
+                artifactId = 'axe-android'
                 packaging 'jar'
                 version = version
                 description 'Axe for Android'
@@ -189,7 +192,7 @@ publishing {
     publications {
         maven(MavenPublication) {
             groupId = group
-            artifactId
+            artifactId = 'axe-android'
             from components.java
         }
     }

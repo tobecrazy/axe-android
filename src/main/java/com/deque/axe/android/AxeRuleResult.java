@@ -2,7 +2,6 @@ package com.deque.axe.android;
 
 import android.support.annotation.NonNull;
 
-import com.deque.axe.android.constants.AxeImpact;
 import com.deque.axe.android.constants.AxeStatus;
 import com.deque.axe.android.utils.AxeTree;
 import com.deque.axe.android.utils.JsonSerializable;
@@ -28,6 +27,11 @@ public class AxeRuleResult implements Comparable<AxeRuleResult>, JsonSerializabl
   public final String axeViewId;
 
   /**
+   * True if the view is visible to the user.
+   */
+  public final Boolean isVisibleToUser;
+
+  /**
    * The properties used in determining that the AxeView was in violation.
    */
   public final AxeProps props;
@@ -45,26 +49,62 @@ public class AxeRuleResult implements Comparable<AxeRuleResult>, JsonSerializabl
   /**
    * The impact of the rule [0=MINOR, 1=MODERATE, 2=SERIOUS, 3=CRITICAL, 4=BLOCKER].
    */
-  public @AxeImpact int impact;
+  public int impact;
 
   /**
    * One of [PASS, FAIL, INCOMPLETE, INAPPLICABLE].
    */
   public final @AxeStatus String status;
 
+  /**
+   * Construct a RuleResult from its components.
+   * @param ruleId The id of the rule.
+   * @param ruleSummary A summary of the rule.
+   * @param axeViewId The id of the view it's associated with.
+   * @param status The status of the rule (PASS, FAIL, etc)
+   * @param impact How sever the issue is.
+   * @param axeProps Properties analyzed to come to these conclusions.
+   */
+  public AxeRuleResult(
+      final String ruleId,
+      final String ruleSummary,
+      final String axeViewId,
+      final String status,
+      final int impact,
+      final AxeProps axeProps,
+      final Boolean isVisibleToUser
+  ) {
+    this.ruleId = ruleId;
+    this.ruleSummary = ruleSummary;
+    this.axeViewId = axeViewId;
+    this.status = status;
+    this.impact = impact;
+    this.props = axeProps;
+    this.isVisibleToUser = isVisibleToUser;
+  }
 
   AxeRuleResult(
       @AxeStatus String status,
       AxeRule axeRule,
       AxeProps axeProps,
-      AxeTree axeView
+      AxeView axeView
   ) {
-    this.ruleId = axeRule != null ? axeRule.id : null;
-    this.ruleSummary = axeRule != null ? axeRule.summary : null;
-    this.props = axeProps;
-    this.status = status;
-    this.axeViewId = axeView == null ? null : axeView.getNodeId();
-    this.impact = axeRule != null ? axeRule.impact : 0;
+    this(
+        axeRule != null ? axeRule.id : null,
+        axeRule != null ? axeRule.summary : null,
+        axeView == null ? null : axeView.getNodeId(),
+        status,
+        axeRule != null ? axeRule.impact : 0,
+        axeProps,
+        axeView != null
+          && (axeView.calculatedProps == null
+              || axeView.calculatedProps.get(
+                      AxePropCalculator.Props.IS_VISIBLE_TO_USER.getProp()) == null
+              || Boolean.parseBoolean(axeView.calculatedProps.get(
+                      AxePropCalculator.Props.IS_VISIBLE_TO_USER.getProp())
+                  )
+              )
+    );
   }
 
   @Override

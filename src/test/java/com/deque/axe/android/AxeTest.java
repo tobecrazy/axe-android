@@ -1,10 +1,12 @@
 package com.deque.axe.android;
 
+import static com.deque.axe.android.constants.AxeImpact.BLOCKER;
+import static com.deque.axe.android.constants.AxeImpact.MINOR;
+import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertFalse;
 
 import com.deque.axe.android.colorcontrast.AxeImage;
-import com.deque.axe.android.constants.AxeImpact;
 import com.deque.axe.android.constants.AxeStandard;
 import com.deque.axe.android.constants.AxeStatus;
 import com.deque.axe.android.constants.Constants;
@@ -15,24 +17,24 @@ import com.deque.axe.android.utils.AxeJankyPng;
 import com.deque.axe.android.utils.JsonSerializable;
 import com.deque.axe.android.wrappers.AxeProps;
 import com.deque.axe.android.wrappers.AxeProps.Name;
-import com.deque.axe.android.wrappers.AxeRect;
 import com.deque.axe.android.wrappers.AxeViewBuilder;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.TypeAdapter;
-import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -77,13 +79,13 @@ public class AxeTest {
     private boolean hasCalledTearDown = false;
 
     protected AxeTestRule() {
-      super(AxeStandard.BEST_PRACTICE, AxeImpact.MINOR, "A Test Rule");
+      super(AxeStandard.BEST_PRACTICE, MINOR.getValue(), "A Test Rule");
     }
 
     @Override
     public void setup(final AxeContext axeContext, final AxeProps axeProps) {
 
-      Assert.assertFalse(hasCalledSetup);
+      assertFalse(hasCalledSetup);
 
       hasCalledSetup = true;
     }
@@ -109,7 +111,7 @@ public class AxeTest {
     @Override
     public void tearDown() {
 
-      Assert.assertFalse(hasCalledTearDown);
+      assertFalse(hasCalledTearDown);
 
       hasCalledTearDown = true;
 
@@ -145,7 +147,7 @@ public class AxeTest {
   public static class AxeRuleThrows extends AxeRuleViewHierarchy {
 
     protected AxeRuleThrows() {
-      super(AxeStandard.BEST_PRACTICE, AxeImpact.BLOCKER, "Blah");
+      super(AxeStandard.BEST_PRACTICE, BLOCKER.getValue(), "Blah");
     }
 
     @Override
@@ -179,7 +181,7 @@ public class AxeTest {
         )
     );
 
-    Assert.assertTrue(!axeResult.axeRuleResults.isEmpty());
+    assertFalse(axeResult.axeRuleResults.isEmpty());
     Assert.assertEquals("blah", axeResult.axeRuleResults.get(0).props.get(Name.EXCEPTION));
   }
 
@@ -220,35 +222,40 @@ public class AxeTest {
   public void testRuleSize() {
 
     AxeConf axeConf = new AxeConf();
-    axeConf.standards.clear();
-    axeConf.standards.add(AxeStandard.WCAG_21);
 
     Axe axe = new Axe(axeConf);
     axe.axeConf.ruleInstances();
 
-    Assert.assertEquals(axeConf.ruleIds.size(), 9);
+    assertEquals(axe.axeConf.ruleIds.size(), 9);
+    assertEquals(axe.axeConf.ruleInstances().size(), 9);
+  }
+
+  @Test
+  public void tesAxeConf() {
+    AxeConf axeConf = new AxeConf();
+
+    assertEquals(axeConf.rules.size(), 9);
+    assertFalse(axeConf.issueFilterConf.onlyShowResultsVisibleToUser);
   }
 
   @Test
   public void testIgnoreRule() {
 
     AxeConf axeConf = new AxeConf();
-    axeConf.standards.clear();
-    axeConf.standards.add(AxeStandard.WCAG_21);
 
     Axe axe = new Axe(axeConf);
     axe.axeConf.ruleInstances();
     axe.axeConf.ignore(EditTextName.class.getSimpleName(), true);
 
-    Assert.assertEquals(axeConf.ruleIds.size(), 8);
+    Assert.assertEquals(axe.axeConf.ruleIds.size(), 8);
+    assertEquals(axe.axeConf.ruleInstances().size(), 9);
+    assertFalse(axe.axeConf.issueFilterConf.onlyShowResultsVisibleToUser);
   }
 
   @Test
   public void testIgnoreMultipleRules() {
 
     AxeConf axeConf = new AxeConf();
-    axeConf.standards.clear();
-    axeConf.standards.add(AxeStandard.WCAG_21);
 
     Axe axe = new Axe(axeConf);
     axe.axeConf.ruleInstances();
@@ -259,110 +266,148 @@ public class AxeTest {
 
     axe.axeConf.ignore(rulesToIgnore, true);
 
-    Assert.assertEquals(axeConf.ruleIds.size(), 7);
+    Assert.assertEquals(axe.axeConf.ruleIds.size(), 7);
+    assertEquals(axe.axeConf.ruleInstances().size(), 9);
+  }
+
+  /**
+   * This test is to catch new objects being added to the preexisting apis.
+   * If this test fails then it means some new parameter has been added into a preexisting api.
+   * But it is not updated in the api_test json file.
+   *
+   * @throws IOException when json is not found.
+   */
+  @Test
+  public void jsonAxeRuleResultTestSpecs() throws IOException {
+
+    File file = new AxeFile("api_test_spec/api_test.json").file;
+    Path path = file.toPath();
+
+    final byte[] encoded = Files.readAllBytes(path);
+
+    final String json = new String(encoded).trim();
+
+    final AxeTestSpec testSpec = JsonSerializable.fromJson(json, AxeTestSpec.class);
+
+    final Axe axe = new Axe(testSpec.axeConf);
+
+    final AxeResult axeResult = axe.run(testSpec.axeContext);
+
+    final List<AxeRuleResult> actualResults = axeResult.axeRuleResults;
+
+    final List<AxeRuleResult> expectedResults = testSpec.axeRuleResults;
+
+    actualResults.sort((o1, o2) -> o1.compareTo(o2));
+
+    expectedResults.sort((o1, o2) -> o1.compareTo(o2));
+
+    assertEquals(expectedResults.size(), actualResults.size());
+    assertFalse("Calculated Result should not be empty!", actualResults.isEmpty());
+
+    JsonParser jsonParser = new JsonParser();
+    
+    expectedResults.forEach(expectedAxeRuleResult -> {
+      AxeRuleResult actualRuleResult = actualResults.get(0);
+      assertEquals(expectedAxeRuleResult.axeViewId, actualRuleResult.axeViewId);
+      assertEquals(expectedAxeRuleResult.ruleId, actualRuleResult.ruleId);
+      assertEquals(expectedAxeRuleResult.ruleSummary, actualRuleResult.ruleSummary);
+
+      String expectedRuleResultString = expectedAxeRuleResult.toJson();
+      Object expectedRuleResultObj = jsonParser.parse(expectedRuleResultString);
+      JsonObject expectedRuleResultJsonObject = (JsonObject) expectedRuleResultObj;
+      Set<String> expectedRuleResultKeySet = expectedRuleResultJsonObject.keySet();
+
+      String actualRuleResultString = actualRuleResult.toJson();
+      Object actualRuleResultObj = jsonParser.parse(actualRuleResultString);
+      JsonObject actualRuleResultJsonObject = (JsonObject) actualRuleResultObj;
+      Set<String> actualRuleResultKeySet = actualRuleResultJsonObject.keySet();
+
+      assertEquals(expectedRuleResultKeySet, actualRuleResultKeySet);
+
+      for (Map.Entry<String, Object> stringObjectEntry : expectedAxeRuleResult.props.entrySet()) {
+        Object key = ((Map.Entry) stringObjectEntry).getKey();
+        assertTrue(actualRuleResult.props.containsKey(key));
+      }
+
+      actualResults.remove(0);
+    });
+
+    assertEquals(actualResults.size(), 0);
   }
 
   @Test
-  public void backwardCompatibilityTest() throws IOException {
+  public void axeViewJsonTest() throws IOException {
+    JsonParser jsonParser = new JsonParser();
 
-    ClassLoader classLoader = getClass().getClassLoader();
+    Object obj = jsonParser.parse(
+            new FileReader("src/test/resources/api_test_spec/api_test.json"));
 
-    assert classLoader != null;
+    JsonObject jsonObject = (JsonObject) obj;
 
-    File file = new AxeFile("test_specs").file;
+    JsonObject axeViewJsonObject = jsonObject
+            .getAsJsonObject("axeContext")
+            .getAsJsonObject("axeView");
 
-    File[] fileList = file.listFiles();
+    Set<String> keySet = axeViewJsonObject.keySet();
 
-    Assert.assertNotNull(fileList);
+    File file = new AxeFile("api_test_spec/api_test.json").file;
+    Path path = file.toPath();
 
-    for (final File fileEntry : fileList) {
+    final byte[] encoded = Files.readAllBytes(path);
 
-      Path path = fileEntry.toPath();
+    final String json = new String(encoded).trim();
 
-      final byte[] encoded = Files.readAllBytes(path);
+    final AxeTestSpec testSpec = JsonSerializable.fromJson(json, AxeTestSpec.class);
 
-      final String json = new String(encoded);
+    String actualAxeViewJson = testSpec.axeContext.axeView.toJson();
 
-      final AxeTestSpec testSpec = JsonSerializable.fromJson(json, AxeTestSpec.class);
+    Object actualAxeObj = jsonParser.parse(actualAxeViewJson);
 
-      final String testInfo = testSpec.testDescription + ": " + path.toString();
+    JsonObject actualAxeViewJsonObject = (JsonObject) actualAxeObj;
 
-      final Axe axe = new Axe(testSpec.axeConf);
+    Set<String> actualAxeViewKeySet = actualAxeViewJsonObject.keySet();
 
-      final List<AxeRuleResult> actualResults = axe.run(testSpec.axeContext).axeRuleResults;
+    assertEquals(actualAxeViewKeySet, keySet);
+  }
 
-      final List<AxeRuleResult> expectedResults = testSpec.axeRuleResults;
+  @Test
+  public void axeMetaDataJsonTest() throws IOException {
+    JsonParser jsonParser = new JsonParser();
 
-      actualResults.sort((o1, o2) -> o1.compareTo(o2));
+    Object obj = jsonParser.parse(
+            new FileReader("src/test/resources/api_test_spec/api_test.json"));
 
-      expectedResults.sort((o1, o2) -> o1.compareTo(o2));
+    JsonObject jsonObject = (JsonObject) obj;
 
-      // Ensure all expected axeRuleResults are present.
-      expectedResults.forEach(axeResult -> {
+    JsonObject axeMetaDataJsonObject = jsonObject
+            .getAsJsonObject("axeContext")
+            .getAsJsonObject("axeMetaData");
 
-        final String message = testInfo + "\n"
-            + "This result was expected, but not present."
-            + axeResult.toJson();
+    Set<String> keySet = axeMetaDataJsonObject.keySet();
 
-        Assert.assertFalse(message, actualResults.isEmpty());
+    File file = new AxeFile("api_test_spec/api_test.json").file;
+    Path path = file.toPath();
 
-        final AxeRuleResult other = actualResults.get(0);
+    final byte[] encoded = Files.readAllBytes(path);
 
-        /*
-         * TODO: Our Test specs don't have this yet. Need to update test specs. This works for now.
-         */
-        other.impact = 0;
-        axeResult.impact = 0;
+    final String json = new String(encoded).trim();
 
-        AxeComparatorInterface comparatorInterface;
+    final AxeTestSpec testSpec = JsonSerializable.fromJson(json, AxeTestSpec.class);
 
-        if (axeResult.axeViewId != null && other.axeViewId != null) {
-          if (!axeResult.axeViewId.equals(other.axeViewId)) {
-            System.out.println(axeResult + "\n" + other);
-          }
-          assertEquals(axeResult.axeViewId, other.axeViewId);
-        }
+    String actualAxeMetaDataJson = testSpec.axeContext.axeMetaData.toJson();
 
-        assertEquals(axeResult.ruleId, other.ruleId);
-        List<Object> missingKeys = new ArrayList<>();
-        List<String> unknownMissingKeys = new ArrayList<>();
+    JsonObject actualAxeMetaDataJsonObject = jsonParser
+            .parse(actualAxeMetaDataJson)
+            .getAsJsonObject();
 
-        if (axeResult.props != other.props) {
-          for (Map.Entry<String, Object> stringObjectEntry : axeResult.props.entrySet()) {
-            Object key = ((Map.Entry) stringObjectEntry).getKey();
-            if (other.props.containsKey(key)) {
-              if (stringObjectEntry.getValue() != null && other.props.get(key) != null) {
-                Object expected = stringObjectEntry.getValue();
-                Object actual = other.props.get(key);
-                comparatorInterface = comparators.getOrDefault(
-                        key,
-                        new AxeComparatorInterface() {});
-                comparatorInterface.compare(key.toString(), expected, actual);
-              }
-            } else {
-              missingKeys.add(key);
-            }
-          }
-          for (Object missingKey: missingKeys) {
-            if (!ignorePropsList.contains(missingKey.toString())) {
-              unknownMissingKeys.add(missingKey.toString());
-            }
-          }
-        }
+    Set<String> actualAxeViewKeySet = actualAxeMetaDataJsonObject.keySet();
 
-        assertEquals("It looks like a prop has been removed or renamed \n",
-                unknownMissingKeys.size(), 0);
-        assertEquals(axeResult.ruleSummary, other.ruleSummary);
-        assertEquals(axeResult.impact, other.impact);
+    assertEquals(actualAxeViewKeySet, keySet);
 
-        actualResults.remove(0);
-      });
-
-      // Ensure the axeRuleResults array is empty when the run is done.
-      if (!actualResults.isEmpty()) {
-        //fail("Unexpected result present: " + actualResults.toString());
+    for (String key: keySet) {
+      if (actualAxeViewKeySet.contains(key)) {
+        assertEquals(key, actualAxeMetaDataJsonObject.get(key), axeMetaDataJsonObject.get(key));
       }
-
     }
   }
 
@@ -373,106 +418,5 @@ public class AxeTest {
     public AxeTestSpec(AxeConf axeConf, AxeContext axeContext, List<AxeRuleResult> axeRuleResults) {
       super(axeConf, axeContext, axeRuleResults);
     }
-  }
-
-  interface AxeComparatorInterface {
-    default void compare(final String key, final Object expected, final Object actual) {
-      assertEquals(key + "\n", expected, actual);
-    }
-
-    default String message(final String key, final Object expected, final Object actual) {
-      return expected.toString() + "\n" + actual.toString();
-    }
-  }
-
-  private static final Map<String, AxeComparatorInterface> comparators = new HashMap<>();
-  private static final List<String> ignorePropsList = new ArrayList<>();
-
-  static {
-    //Add all props that we know are present in old result but not anymore in new result
-    ignorePropsList.add("height");
-    ignorePropsList.add("width");
-
-    comparators.put("boundsInScreen", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "Frame Bottom:\n" + message(key, expected, actual),
-                ((LinkedTreeMap) expected).get("bottom"),
-                (double) ((AxeRect) actual).bottom
-        );
-        assertEquals(
-                "Frame Left:\n" + message(key, expected, actual),
-                ((LinkedTreeMap) expected).get("left"),
-                (double) ((AxeRect) actual).left
-        );
-        assertEquals(
-                "Frame Top:\n" + message(key, expected, actual),
-                ((LinkedTreeMap) expected).get("top"),
-                (double) ((AxeRect) actual).top
-        );
-        assertEquals(
-                "Frame Right:\n" + message(key, expected, actual),
-                ((LinkedTreeMap) expected).get("right"),
-                (double) ((AxeRect) actual).right
-        );
-      }
-    });
-
-    comparators.put("Speakable Text", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "Speakable Text:\n" + message(key, expected, actual),
-                expected.toString().trim(),
-                actual.toString().replaceAll("\n", " ").trim());
-      }
-    });
-
-    comparators.put("Color Contrast Ratio", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "colorContrast:\n" + message(key, expected, actual),
-                (double)expected,
-                (double)actual, 0.1);
-      }
-    });
-
-    comparators.put("Foreground Color", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "Color Fore Ground:\n" + message(key, expected, actual),
-                expected.toString(),
-                actual.toString());
-      }
-    });
-
-    comparators.put("Background Color", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "colorBackGround:\n" + message(key, expected, actual),
-                expected.toString(),
-                actual.toString());
-      }
-    });
-
-    comparators.put("Screen Dots Per Inch", new AxeComparatorInterface() {
-      @Override
-      public void compare(String key, Object expected, Object actual) {
-
-        assertEquals(
-                "DPI:\n" + message(key, expected, actual),
-                expected.toString(),
-                actual.toString());
-      }
-    });
   }
 }

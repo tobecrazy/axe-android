@@ -106,6 +106,26 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
   public final String value;
 
   /**
+   * True if the view overrides AccessibilityDelegate.
+   */
+  public final boolean overridesAccessibilityDelegate;
+
+  /**
+   * True if the view is visible to the user.
+   */
+  public final boolean isVisibleToUser;
+
+  /**
+   * Direct copy of the associated Android Property.
+   */
+  public final int measuredHeight;
+
+  /**
+   * Direct copy of the associated Android Property.
+   */
+  public final int measuredWidth;
+
+  /**
    * Maintains a copy of Content View Axe Rect.
    */
   static AxeRect contentViewAxeRect;
@@ -152,6 +172,14 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
 
     List<AxeView> children();
 
+    boolean overridesAccessibilityDelegate();
+
+    boolean isVisibleToUser();
+
+    int measuredHeight();
+
+    int measuredWidth();
+
     default AxeView build() {
       return new AxeView(this);
     }
@@ -172,7 +200,11 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
       final String viewIdResourceName,
       final String hintText,
       final String value,
-      final List<AxeView> children
+      final List<AxeView> children,
+      final boolean overridesAccessibilityDelegate,
+      final boolean isVisibleToUser,
+      final int measuredHeight,
+      final int measuredWidth
   ) {
     this.boundsInScreen = boundsInScreen;
     this.className = className;
@@ -189,6 +221,10 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
     this.hintText = hintText;
     this.value = value;
     this.children = children;
+    this.overridesAccessibilityDelegate = overridesAccessibilityDelegate;
+    this.isVisibleToUser = isVisibleToUser;
+    this.measuredHeight = measuredHeight;
+    this.measuredWidth = measuredWidth;
 
     setContentView(viewIdResourceName, boundsInScreen);
     this.calculatedProps = calculateProps();
@@ -220,7 +256,11 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
         builder.viewIdResourceName(),
         builder.hintText(),
         builder.value(),
-        builder.children()
+        builder.children(),
+        builder.overridesAccessibilityDelegate(),
+        builder.isVisibleToUser(),
+        builder.measuredHeight(),
+        builder.measuredWidth()
     );
   }
 
@@ -418,13 +458,16 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
 
     String labelText = labeledBy == null ? "" : labeledBy.text;
 
-    AxePropCalculator axePropCalculator = new AxePropCalculator(text,
+    AxePropCalculator axePropCalculator = new AxePropCalculator(
+            text,
             contentDescription,
             labelText,
             value,
             isEnabled,
             className,
-            hintText);
+            hintText,
+            isVisibleToUser
+    );
 
     return axePropCalculator.getCalculatedProps();
   }
@@ -442,10 +485,15 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
 
   private AxeView getContentView() {
 
-    if (isContentView() || children.isEmpty()) {
-      return this;
+    List<AxeView> axeViewList = query(view ->
+            view.viewIdResourceName != null
+              && view.viewIdResourceName.endsWith("android:id/content")
+    );
+
+    if (axeViewList.size() == 0) {
+      return null;
     } else {
-      return children.get(0).getContentView();
+      return axeViewList.get(0);
     }
   }
 
@@ -461,17 +509,17 @@ public class AxeView implements AxeTree<AxeView>, Comparable<AxeView>, JsonSeria
     
     final AxeView contentView = getContentView();
 
-    if (contentView.isContentView()) {
+    if (contentView != null && contentView.isContentView()) {
 
       final StringBuilder result = new StringBuilder();
 
-      contentView.children.forEach(axeView -> {
+      for (AxeView axeView : contentView.children) {
         if (result.length() == 0
                 && axeView.viewIdResourceName != null
                 && !"null".equals(axeView.viewIdResourceName)) {
           result.append(axeView.viewIdResourceName);
         }
-      });
+      }
 
       return result.toString();
     }
