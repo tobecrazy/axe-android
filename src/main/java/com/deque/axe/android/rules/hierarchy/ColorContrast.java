@@ -55,9 +55,10 @@ public class ColorContrast extends InformativeView {
       axeProps.put(Name.COLOR_BACKGROUND, background);
       axeProps.put(Name.COLOR_FOREGROUND, foreground);
       axeProps.put(Name.CONFIDENCE, result.getConfidence());
-      axeProps.put(Name.IS_OFF_SCREEN,
-              axeView.isOffScreen(axeView.boundsInScreen,
-                      axeDevice.screenHeight, axeDevice.screenWidth));
+      axeProps.put(
+          Name.IS_OFF_SCREEN,
+          axeView.isOffScreen(axeDevice.screenHeight, axeDevice.screenWidth)
+      );
 
       if (background != null && foreground != null) {
         axeProps.put(Name.COLOR_CONTRAST, background.contrast(foreground));
@@ -77,11 +78,16 @@ public class ColorContrast extends InformativeView {
       return AxeStatus.INAPPLICABLE;
     }
 
-    if (EditTextValue.EDITABLE_TYPE_NAMES.contains(axeProps.get(Name.CLASS_NAME, String.class))) {
+    if (axeProps.get(Name.IS_VISIBLE_TO_USER) != null
+            && !axeProps.get(Name.IS_VISIBLE_TO_USER, Boolean.class)) {
+      return AxeStatus.INAPPLICABLE;
+    }
+
+    if (confidence == null) {
       return AxeStatus.INCOMPLETE;
     }
 
-    if (confidence == null || !confidence.contains(Confidence.HIGH)) {
+    if (!confidence.contains(Confidence.HIGH)) {
       return AxeStatus.PASS;
     }
 
